@@ -54,6 +54,23 @@ export function formatPercent(value: number): string {
   return percent.format(value / 100);
 }
 
+/** Base-asset volume from Binance klines (not EUR). */
+export function formatVolume(value: number): string {
+  if (!Number.isFinite(value)) return "–";
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) {
+    return `${(value / 1_000_000).toLocaleString("de-DE", {
+      maximumFractionDigits: 2,
+    })} Mio`;
+  }
+  if (abs >= 1000) {
+    return value.toLocaleString("de-DE", { maximumFractionDigits: 2 });
+  }
+  return value.toLocaleString("de-DE", {
+    maximumFractionDigits: abs >= 1 ? 3 : 6,
+  });
+}
+
 export function formatChartTick(timestamp: number, rangeId: string): string {
   const d = new Date(timestamp);
   if (rangeId === "5m" || rangeId === "15m") {

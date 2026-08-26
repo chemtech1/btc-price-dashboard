@@ -5,9 +5,11 @@ import {
   CandlestickSeries,
   ColorType,
   CrosshairMode,
+  HistogramSeries,
   LineStyle,
   createChart,
   type CandlestickData,
+  type HistogramData,
   type IChartApi,
   type ISeriesApi,
   type MouseEventParams,
@@ -18,7 +20,12 @@ import {
   CANDLE_LIMIT_MOBILE,
   type CandleIntervalId,
 } from "../lib/candle-ranges";
-import { formatAxisPrice, formatCandleTooltipTime, formatEur } from "../lib/format";
+import {
+  formatAxisPrice,
+  formatCandleTooltipTime,
+  formatEur,
+  formatVolume,
+} from "../lib/format";
 import type { CandlePoint } from "../lib/types";
 import { useNarrow } from "../lib/use-narrow";
 
@@ -72,19 +79,38 @@ function toSeries(candles: CandlePoint[]): CandlestickData<Time>[] {
   return out;
 }
 
+function toVolumeSeries(candles: CandlePoint[]): HistogramData<Time>[] {
+  const out: HistogramData<Time>[] = [];
+  let lastTime = -1;
+  for (const c of candles) {
+    const time = Math.floor(c.t / 1000) as UTCTimestamp;
+    if (time <= lastTime) continue;
+    lastTime = time;
+    out.push({
+      time,
+      value: c.volume,
+      color: c.close >= c.open ? `${UP}99` : `${DOWN}99`,
+    });
+  }
+  return out;
+}
+
 function barFromParam(
   param: MouseEventParams<Time>,
   series: ISeriesApi<"Candlestick">,
+  candles: CandlePoint[],
 ): CandlePoint | null {
   const raw = param.seriesData.get(series) as CandlestickData<Time> | undefined;
   if (!raw || typeof raw.time !== "number") return null;
+  const t = raw.time * 1000;
+  const vol = candles.find((c) => c.t === t)?.volume ?? 0;
   return {
-    t: raw.time * 1000,
+    t,
     open: raw.open,
     high: raw.high,
     low: raw.low,
     close: raw.close,
-    volume: 0,
+    volume: vol,
   };
 }
 
@@ -127,6 +153,10 @@ function CandleTipBox({
         <span>Schließen</span>
         <span>{formatEur(c.close)}</span>
       </p>
+      <p className="flex justify-between gap-4 text-zinc-300">
+        <span>Volumen</span>
+        <span>{formatVolume(c.volume)}</span>
+      </p>
     </div>
   );
 }
@@ -142,6 +172,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const candlesRef = useRef(visible);
   candlesRef.current = visible;
   const pinnedRef = useRef(false);
@@ -245,13 +276,27 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
       lastValueVisible: false,
       priceLineVisible: false,
     });
+    series.priceScale().applyOptions({
+      scaleMargins: { top: 0.08, bottom: 0.24 },
+    });
+
+    const volume = chart.addSeries(HistogramSeries, {
+      priceScaleId: "volume",
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    volume.priceScale().applyOptions({
+      scaleMargins: { top: 0.78, bottom: 0 },
+      borderVisible: false,
+    });
 
     chartRef.current = chart;
     seriesRef.current = series;
+    volumeRef.current = volume;
 
     const onMove = (param: MouseEventParams<Time>) => {
       if (pinnedRef.current) return;
-      const bar = barFromParam(param, series);
+      const bar = barFromParam(param, series, candlesRef.current);
       if (!bar || !param.point) {
         setTip(null);
         return;
@@ -260,7 +305,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     };
 
     const onClick = (param: MouseEventParams<Time>) => {
-      const bar = barFromParam(param, series);
+      const bar = barFromParam(param, series, candlesRef.current);
       if (!bar || !param.point) {
         pinnedRef.current = false;
         setTip(null);
@@ -307,6 +352,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      volumeRef.current = null;
     };
   }, [syncOverlay]);
 
@@ -315,6 +361,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     const chart = chartRef.current;
     if (!series || !chart) return;
     series.setData(toSeries(visible));
+    volumeRef.current?.setData(toVolumeSeries(visible));
     if (!pinnedRef.current) {
       setTip(null);
     }
@@ -347,7 +394,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
   return (
     <div
       ref={wrapRef}
-      className="relative h-[55vh] min-h-64 max-h-[28rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-96 sm:p-4"
+      className="relative h-[58vh] min-h-64 max-h-[32rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-[26rem] sm:p-4"
     >
       {error ? (
         <p className="absolute inset-0 z-20 flex items-center justify-center px-4 text-center text-rose-300">
