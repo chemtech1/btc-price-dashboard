@@ -169,6 +169,7 @@ export function FearGreedPage() {
           {chartRows.length > 1 ? (
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
+                accessibilityLayer={false}
                 data={chartRows}
                 margin={{ top: 8, right: narrow ? 4 : 8, left: 0, bottom: 0 }}
               >

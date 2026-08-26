@@ -76,6 +76,7 @@ export function PriceChart({ points, rangeId, loading, error }: Props) {
     <div className="h-[55vh] min-h-64 max-h-[28rem] w-full select-none rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 outline-none touch-manipulation [-webkit-tap-highlight-color:transparent] sm:h-96 sm:p-4">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
+          accessibilityLayer={false}
           data={points}
           margin={{ top: 8, right: 4, left: narrow ? 0 : 4, bottom: 0 }}
         >

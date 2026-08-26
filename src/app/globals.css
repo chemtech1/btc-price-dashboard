@@ -17,6 +17,13 @@ canvas {
   -webkit-tap-highlight-color: transparent;
 }
 
+.recharts-wrapper,
+.recharts-wrapper *:focus,
+.recharts-surface:focus {
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background:
     radial-gradient(1200px 600px at 10% -10%, rgba(249, 115, 22, 0.12), transparent 55%),
