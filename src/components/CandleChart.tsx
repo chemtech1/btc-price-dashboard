@@ -13,8 +13,9 @@ import {
   YAxis,
 } from "recharts";
 import type { CandleIntervalId } from "../lib/candle-ranges";
-import { formatCandleTick, formatCandleTooltipTime, formatEur } from "../lib/format";
+import { formatAxisPrice, formatCandleTick, formatCandleTooltipTime, formatEur } from "../lib/format";
 import type { CandlePoint } from "../lib/types";
+import { useNarrow } from "../lib/use-narrow";
 
 type Props = {
   candles: CandlePoint[];
@@ -94,6 +95,8 @@ function CandleBody(props: {
 }
 
 export function CandleChart({ candles, intervalId, loading, error }: Props) {
+  const narrow = useNarrow();
+
   if (error) {
     return (
       <div className="flex h-[55vh] min-h-64 max-h-[28rem] items-center justify-center rounded-2xl border border-rose-500/30 bg-rose-500/5 px-4 text-center text-rose-300 sm:h-96">
@@ -130,7 +133,10 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
   return (
     <div className="h-[55vh] min-h-64 max-h-[28rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-96 sm:p-4">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+        <BarChart
+          data={rows}
+          margin={{ top: 8, right: 4, left: narrow ? 0 : 4, bottom: 0 }}
+        >
           <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
           <XAxis
             dataKey="t"
@@ -141,10 +147,15 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
           />
           <YAxis
             domain={[min - pad, max + pad]}
-            tickFormatter={(v) => formatEur(Number(v), true)}
-            width={88}
+            tickFormatter={(v) =>
+              narrow ? formatAxisPrice(Number(v)) : formatEur(Number(v), true)
+            }
+            width={narrow ? 0 : 88}
+            mirror={narrow}
+            axisLine={!narrow}
+            tickLine={!narrow}
             stroke="#71717a"
-            tick={{ fill: "#a1a1aa", fontSize: 11 }}
+            tick={{ fill: "#a1a1aa", fontSize: narrow ? 10 : 11 }}
           />
           <Tooltip
             content={<CandleTooltip intervalId={intervalId} />}

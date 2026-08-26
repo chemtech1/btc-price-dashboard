@@ -9,9 +9,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatChartTick, formatEur, formatTooltipTime } from "../lib/format";
+import { formatAxisPrice, formatChartTick, formatEur, formatTooltipTime } from "../lib/format";
 import type { HistoryPoint } from "../lib/types";
 import type { RangeId } from "../lib/ranges";
+import { useNarrow } from "../lib/use-narrow";
 
 type Props = {
   points: HistoryPoint[];
@@ -40,6 +41,8 @@ function ChartTooltip({
 }
 
 export function PriceChart({ points, rangeId, loading, error }: Props) {
+  const narrow = useNarrow();
+
   if (error) {
     return (
       <div className="flex h-[55vh] min-h-64 max-h-[28rem] items-center justify-center rounded-2xl border border-rose-500/30 bg-rose-500/5 px-4 text-center text-rose-300 sm:h-96">
@@ -72,7 +75,10 @@ export function PriceChart({ points, rangeId, loading, error }: Props) {
   return (
     <div className="h-[55vh] min-h-64 max-h-[28rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-96 sm:p-4">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={points} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+        <AreaChart
+          data={points}
+          margin={{ top: 8, right: 4, left: narrow ? 0 : 4, bottom: 0 }}
+        >
           <defs>
             <linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
@@ -91,10 +97,15 @@ export function PriceChart({ points, rangeId, loading, error }: Props) {
           />
           <YAxis
             domain={[min - pad, max + pad]}
-            tickFormatter={(v) => formatEur(Number(v), true)}
-            width={88}
+            tickFormatter={(v) =>
+              narrow ? formatAxisPrice(Number(v)) : formatEur(Number(v), true)
+            }
+            width={narrow ? 0 : 88}
+            mirror={narrow}
+            axisLine={!narrow}
+            tickLine={!narrow}
             stroke="#71717a"
-            tick={{ fill: "#a1a1aa", fontSize: 11 }}
+            tick={{ fill: "#a1a1aa", fontSize: narrow ? 10 : 11 }}
           />
           <Tooltip content={<ChartTooltip rangeId={rangeId} />} />
           <Area

@@ -33,6 +33,22 @@ export function formatUsd(value: number): string {
   return usd.format(value);
 }
 
+/** Short Y-axis ticks for mobile (no currency). */
+export function formatAxisPrice(value: number): string {
+  if (!Number.isFinite(value)) return "–";
+  const abs = Math.abs(value);
+  if (abs >= 1000) {
+    return `${(value / 1000).toLocaleString("de-DE", {
+      maximumFractionDigits: 1,
+      minimumFractionDigits: 0,
+    })}k`;
+  }
+  return value.toLocaleString("de-DE", {
+    maximumFractionDigits: abs >= 1 ? 2 : 4,
+    minimumFractionDigits: 0,
+  });
+}
+
 export function formatPercent(value: number): string {
   if (!Number.isFinite(value)) return "–";
   return percent.format(value / 100);
