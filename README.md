@@ -5,7 +5,7 @@ Next.js-Webapp für aktuelle Krypto-Preise in **EUR** und historischen Verlauf a
 - Datenquelle: **Binance** Spot Market Data (kein API-Key)
 - Nur Handelspaare mit Quote **EUR** (z. B. `BTCEUR`, `ETHEUR`)
 - Standard-Coin: Bitcoin (`BTCEUR`)
-- Weitere Coins über das **Coins-Menü** (Watchlist im Browser)
+- Weitere Coins über das **Coins-Menü** (Watchlist auf dem Server, alle Geräte)
 - Verlauf: Umschalter **Linie** / **Kerzen**
 - Linie: 5 Min, 15 Min (1s), 1 Std, Tag, Woche, Monat, 6 Monate, Jahr, Alles
 - Kerzen: Intervalle **10s · 1m · 5m · 15m · 1h · 4h · 1d** (OHLC; `10s` aus Binance-1s aggregiert)
@@ -71,7 +71,7 @@ systemctl status crypto-dashboard.service
 
 ## Hinweise
 
-- Watchlist liegt in `localStorage` (Key `crypto-watchlist-v2`, pro Browser/Gerät).
+- Watchlist liegt in **SQLite** auf dem Server (`GET`/`PUT /api/watchlist`) und zusätzlich in `localStorage` als Fallback. Alle Geräte dieser Installation teilen die Liste; sie bleibt nach Browser-Close erhalten.
 - Marktdaten (EUR-Paare, Ticker, Kerzen) werden lokal in **SQLite** gespeichert und von Binance nachgezogen.
 - Beim Seitenaufruf und gestaffelt im Hintergrund (Ticker ~1 Min, Tages-History ~15 Min, Prune ~1 Std) werden Daten nachgezogen.
 - **1-Sekunden-Kerzen** nur on-demand für „5 Min“/„15 Min“, nicht im Hintergrund; Aufbewahrung ca. 2 Stunden.

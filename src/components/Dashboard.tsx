@@ -29,7 +29,7 @@ const CHART_MODE_KEY = "crypto-chart-mode-v1";
 
 function loadChartMode(): ChartMode {
   try {
-    const raw = sessionStorage.getItem(CHART_MODE_KEY);
+    const raw = localStorage.getItem(CHART_MODE_KEY);
     if (raw === "line" || raw === "candle") return raw;
   } catch {
     /* ignore */
@@ -39,12 +39,24 @@ function loadChartMode(): ChartMode {
 
 function loadCandleInterval(): CandleIntervalId {
   try {
-    const raw = sessionStorage.getItem(CANDLE_INTERVAL_KEY);
+    const raw = localStorage.getItem(CANDLE_INTERVAL_KEY);
     if (raw && isCandleInterval(raw)) return raw;
   } catch {
     /* ignore */
   }
   return DEFAULT_CANDLE_INTERVAL;
+}
+
+function persistWatchlistToServer(coins: WatchedCoin[], activeId: string) {
+  saveWatchlist(coins);
+  saveActiveCoinId(activeId);
+  void fetch("/api/watchlist", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ coins, activeId }),
+  }).catch(() => {
+    /* localStorage already written */
+  });
 }
 
 export function Dashboard() {
@@ -63,17 +75,57 @@ export function Dashboard() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [tabVisible, setTabVisible] = useState(true);
   /** Bumped only when coin/range/mode changes — not on every poll. */
   const historyEpochRef = useRef(0);
   const historyInFlightRef = useRef(false);
 
   useEffect(() => {
-    const list = loadWatchlist();
-    setWatchlist(list);
-    setActiveId(loadActiveCoinId(list));
-    setChartMode(loadChartMode());
-    setCandleInterval(loadCandleInterval());
-    setHydrated(true);
+    const syncVisible = () =>
+      setTabVisible(document.visibilityState !== "hidden");
+    syncVisible();
+    document.addEventListener("visibilitychange", syncVisible);
+    return () => document.removeEventListener("visibilitychange", syncVisible);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrate() {
+      let list = loadWatchlist();
+      let active = loadActiveCoinId(list);
+      try {
+        const res = await fetch("/api/watchlist", { cache: "no-store" });
+        if (res.ok) {
+          const data = (await res.json()) as {
+            coins?: WatchedCoin[];
+            activeId?: string;
+          };
+          if (Array.isArray(data.coins) && data.coins.length > 0) {
+            list = data.coins;
+            active =
+              data.activeId && list.some((c) => c.id === data.activeId)
+                ? data.activeId
+                : list[0].id;
+            saveWatchlist(list);
+            saveActiveCoinId(active);
+          }
+        }
+      } catch {
+        /* keep localStorage */
+      }
+      if (cancelled) return;
+      setWatchlist(list);
+      setActiveId(active);
+      setChartMode(loadChartMode());
+      setCandleInterval(loadCandleInterval());
+      setHydrated(true);
+    }
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const idsKey = useMemo(() => watchlist.map((c) => c.id).join(","), [watchlist]);
@@ -83,7 +135,7 @@ export function Dashboard() {
   function changeChartMode(mode: ChartMode) {
     setChartMode(mode);
     try {
-      sessionStorage.setItem(CHART_MODE_KEY, mode);
+      localStorage.setItem(CHART_MODE_KEY, mode);
     } catch {
       /* ignore */
     }
@@ -92,7 +144,7 @@ export function Dashboard() {
   function changeCandleInterval(interval: CandleIntervalId) {
     setCandleInterval(interval);
     try {
-      sessionStorage.setItem(CANDLE_INTERVAL_KEY, interval);
+      localStorage.setItem(CANDLE_INTERVAL_KEY, interval);
     } catch {
       /* ignore */
     }
@@ -177,7 +229,7 @@ export function Dashboard() {
   );
 
   useEffect(() => {
-    if (!hydrated || !idsKey) return;
+    if (!hydrated || !idsKey || !tabVisible) return;
     setPriceLoading(true);
     const controller = new AbortController();
     void refreshPrices(controller.signal);
@@ -198,10 +250,10 @@ export function Dashboard() {
       window.clearInterval(watchlistTimer);
       if (rangeTimer != null) window.clearInterval(rangeTimer);
     };
-  }, [hydrated, idsKey, refreshPrices, activeId, pollMs]);
+  }, [hydrated, idsKey, refreshPrices, activeId, pollMs, tabVisible]);
 
   useEffect(() => {
-    if (!hydrated || !activeId) return;
+    if (!hydrated || !activeId || !tabVisible) return;
     const controller = new AbortController();
     void refreshHistory(controller.signal, { showLoading: true });
 
@@ -215,33 +267,30 @@ export function Dashboard() {
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [hydrated, activeId, range, chartMode, candleInterval, pollMs, refreshHistory]);
+  }, [hydrated, activeId, range, chartMode, candleInterval, pollMs, refreshHistory, tabVisible]);
 
   function selectCoin(id: string) {
     setActiveId(id);
-    saveActiveCoinId(id);
+    persistWatchlistToServer(watchlist, id);
   }
 
   function addCoin(coin: WatchedCoin) {
     setWatchlist((prev) => {
       if (prev.some((c) => c.id === coin.id)) return prev;
       const next = [...prev, coin];
-      saveWatchlist(next);
+      persistWatchlistToServer(next, coin.id);
       return next;
     });
-    selectCoin(coin.id);
+    setActiveId(coin.id);
   }
 
   function removeCoin(id: string) {
     setWatchlist((prev) => {
       if (prev.length <= 1) return prev;
       const next = prev.filter((c) => c.id !== id);
-      saveWatchlist(next);
-      if (activeId === id) {
-        const fallback = next[0].id;
-        setActiveId(fallback);
-        saveActiveCoinId(fallback);
-      }
+      const nextActive = activeId === id ? next[0].id : activeId;
+      if (activeId === id) setActiveId(nextActive);
+      persistWatchlistToServer(next, nextActive);
       return next;
     });
   }

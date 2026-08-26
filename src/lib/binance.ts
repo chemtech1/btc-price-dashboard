@@ -109,6 +109,29 @@ export async function fetchTickerFromBinance(symbol: string): Promise<Ticker24h>
   );
 }
 
+/** One Binance 24h-ticker call for many symbols; falls back to per-symbol. */
+export async function fetchTickersFromBinance(
+  symbols: string[],
+): Promise<Ticker24h[]> {
+  const unique = [...new Set(symbols)];
+  if (unique.length === 0) return [];
+  if (unique.length === 1) {
+    return [await fetchTickerFromBinance(unique[0])];
+  }
+
+  const param = encodeURIComponent(JSON.stringify(unique));
+  try {
+    const data = await binanceFetch<Ticker24h[] | Ticker24h>(
+      `/api/v3/ticker/24hr?symbols=${param}`,
+    );
+    const list = Array.isArray(data) ? data : [data];
+    if (list.length === 0) throw new Error("empty ticker batch");
+    return list;
+  } catch {
+    return Promise.all(unique.map((s) => fetchTickerFromBinance(s)));
+  }
+}
+
 /** Binance kline row */
 export type KlineRow = [
   number, // open time

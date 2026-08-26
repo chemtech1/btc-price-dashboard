@@ -7,8 +7,28 @@ export const DEFAULT_WATCHLIST: WatchedCoin[] = [
 const STORAGE_KEY = "crypto-watchlist-v2";
 const ACTIVE_KEY = "crypto-active-coin-v2";
 
-function isValidWatched(c: WatchedCoin): boolean {
+export function isValidWatched(c: WatchedCoin): boolean {
   return Boolean(c?.id && c?.symbol && c?.name && /^[A-Z0-9]+EUR$/.test(c.id));
+}
+
+export function sanitizeWatchlistPayload(
+  coinsRaw: unknown,
+  activeIdRaw: unknown,
+): { coins: WatchedCoin[]; activeId: string } | null {
+  if (!Array.isArray(coinsRaw) || coinsRaw.length === 0) return null;
+  const coins = (coinsRaw as WatchedCoin[]).filter(isValidWatched);
+  if (coins.length === 0) return null;
+  const seen = new Set<string>();
+  const unique = coins.filter((c) => {
+    if (seen.has(c.id)) return false;
+    seen.add(c.id);
+    return true;
+  });
+  const activeId =
+    typeof activeIdRaw === "string" && unique.some((c) => c.id === activeIdRaw)
+      ? activeIdRaw
+      : unique[0].id;
+  return { coins: unique, activeId };
 }
 
 export function loadWatchlist(): WatchedCoin[] {

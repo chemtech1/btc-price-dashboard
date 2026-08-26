@@ -41,7 +41,14 @@ CREATE INDEX IF NOT EXISTS idx_klines_symbol_interval_time
 
 CREATE INDEX IF NOT EXISTS idx_tickers_fetched_at
   ON tickers (fetched_at DESC);
-`;
+
+CREATE TABLE IF NOT EXISTS watchlist (
+  symbol TEXT PRIMARY KEY,
+  symbol_short TEXT NOT NULL,
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL
+);
+`
 
 type GlobalDb = typeof globalThis & {
   __cryptoDb?: Database.Database;

@@ -1,5 +1,14 @@
 import { getDb, getMeta, setMeta } from "./db";
-import type { CandlePoint, CoinPrice, EurPair, HistoryPoint } from "./types";
+import type {
+  CandlePoint,
+  CoinPrice,
+  EurPair,
+  HistoryPoint,
+  WatchedCoin,
+} from "./types";
+import { DEFAULT_WATCHLIST } from "./watchlist";
+
+export const META_WATCHLIST_ACTIVE = "watchlist_active_id";
 
 export type KlineRowDb = {
   symbol: string;
@@ -239,6 +248,55 @@ export function pruneOldKlines(retentionMs: Record<string, number>): void {
     for (const [interval, keepMs] of Object.entries(retentionMs)) {
       stmt.run(interval, now - keepMs);
     }
+  });
+  tx();
+}
+
+export function getWatchlist(): { coins: WatchedCoin[]; activeId: string } {
+  const rows = getDb()
+    .prepare(
+      `SELECT symbol, symbol_short, name, sort_order
+       FROM watchlist
+       ORDER BY sort_order ASC, symbol ASC`,
+    )
+    .all() as {
+    symbol: string;
+    symbol_short: string;
+    name: string;
+    sort_order: number;
+  }[];
+
+  if (rows.length === 0) {
+    replaceWatchlist(DEFAULT_WATCHLIST, DEFAULT_WATCHLIST[0].id);
+    return { coins: DEFAULT_WATCHLIST, activeId: DEFAULT_WATCHLIST[0].id };
+  }
+
+  const coins: WatchedCoin[] = rows.map((r) => ({
+    id: r.symbol,
+    symbol: r.symbol_short,
+    name: r.name,
+  }));
+  const stored = getMeta(META_WATCHLIST_ACTIVE);
+  const activeId =
+    stored && coins.some((c) => c.id === stored) ? stored : coins[0].id;
+  return { coins, activeId };
+}
+
+export function replaceWatchlist(coins: WatchedCoin[], activeId: string): void {
+  const db = getDb();
+  const tx = db.transaction(() => {
+    db.prepare("DELETE FROM watchlist").run();
+    const insert = db.prepare(
+      `INSERT INTO watchlist (symbol, symbol_short, name, sort_order)
+       VALUES (?, ?, ?, ?)`,
+    );
+    coins.forEach((c, i) => {
+      insert.run(c.id, c.symbol, c.name, i);
+    });
+    const active = coins.some((c) => c.id === activeId)
+      ? activeId
+      : coins[0]?.id ?? "BTCEUR";
+    setMeta(META_WATCHLIST_ACTIVE, active);
   });
   tx();
 }

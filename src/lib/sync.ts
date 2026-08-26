@@ -2,7 +2,7 @@ import {
   fetchEurPairsFromBinance,
   fetchHistoryPagesFromBinance,
   fetchKlinesPageFromBinance,
-  fetchTickerFromBinance,
+  fetchTickersFromBinance,
   isEurSymbol,
   klineRowsToDb,
   normalizeSymbol,
@@ -96,11 +96,9 @@ export async function ensureTickers(symbols: string[]): Promise<CoinPrice[]> {
 
   if (stale.length > 0) {
     try {
-      const fetched = await Promise.all(
-        stale.map(async (symbol) => {
-          const ticker = await fetchTickerFromBinance(symbol);
-          return tickerToPrice(ticker, baseBySymbol.get(symbol));
-        }),
+      const tickers = await fetchTickersFromBinance(stale);
+      const fetched = tickers.map((ticker) =>
+        tickerToPrice(ticker, baseBySymbol.get(ticker.symbol)),
       );
 
       upsertTickers(

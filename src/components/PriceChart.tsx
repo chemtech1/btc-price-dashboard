@@ -72,7 +72,7 @@ export function PriceChart({ points, rangeId, loading, error }: Props) {
   return (
     <div className="h-[55vh] min-h-64 max-h-[28rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-96 sm:p-4">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={points} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+        <AreaChart data={points} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
           <defs>
             <linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
@@ -92,7 +92,7 @@ export function PriceChart({ points, rangeId, loading, error }: Props) {
           <YAxis
             domain={[min - pad, max + pad]}
             tickFormatter={(v) => formatEur(Number(v), true)}
-            width={58}
+            width={88}
             stroke="#71717a"
             tick={{ fill: "#a1a1aa", fontSize: 11 }}
           />

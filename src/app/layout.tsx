@@ -16,6 +16,11 @@ export const metadata: Metadata = {
   title: "Crypto Preis Dashboard",
   description: "Bitcoin und weitere Kryptowährungen – Preis und Verlauf in EUR",
   applicationName: "Crypto Dashboard",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
