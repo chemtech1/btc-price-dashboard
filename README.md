@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Crypto Preis Dashboard
 
-## Getting Started
+Next.js-Webapp für aktuelle Krypto-Preise in **EUR** und historischen Verlauf als Chart.
 
-First, run the development server:
+- Datenquelle: **Binance** Spot Market Data (kein API-Key)
+- Nur Handelspaare mit Quote **EUR** (z. B. `BTCEUR`, `ETHEUR`)
+- Standard-Coin: Bitcoin (`BTCEUR`)
+- Weitere Coins über das **Coins-Menü** (Watchlist im Browser)
+- Verlauf: Umschalter **Linie** / **Kerzen**
+- Linie: 5 Min, 15 Min (1s), 1 Std, Tag, Woche, Monat, 6 Monate, Jahr, Alles
+- Kerzen: Intervalle **10s · 1m · 5m · 15m · 1h · 4h · 1d** (OHLC; `10s` aus Binance-1s aggregiert)
+- Live-Aufbau der offenen Kerze: **10s** ~jede Sekunde, andere Kerzen-Intervalle ~alle 5 Sekunden
+
+## Voraussetzungen
+
+- Node.js 20+
+
+## Lokal starten
 
 ```bash
+cd btc-price-dashboard
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Browser: [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Optional: andere Binance-Basis-URL (z. B. wenn `api.binance.com` blockiert ist) und DB-Pfad:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# .env.local
+BINANCE_API_BASE=https://data-api.binance.vision
+CRYPTO_DB_PATH=/var/lib/crypto-dashboard/crypto.db
+```
 
-## Learn More
+Ohne `CRYPTO_DB_PATH` liegt die SQLite-Datei unter `data/crypto.db` im Projektverzeichnis.
 
-To learn more about Next.js, take a look at the following resources:
+## Produktion
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm ci
+npm run build
+npm start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Lauscht auf `0.0.0.0:3000` → `http://<SERVER-IP>:3000`
 
-## Deploy on Vercel
+## Deploy auf Proxmox (Kurzfassung)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. LXC/VM mit Node.js 20+ und LAN-IP.
+2. Projekt bauen (`npm ci && npm run build`).
+3. `npm start` oder systemd-Unit (WorkingDirectory auf das Projekt, `ExecStart=/usr/bin/npm start`).
+4. Port **3000/tcp** freigeben.
+5. Zugriff: `http://<LXC-oder-VM-IP>:3000`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Beispiel-Unit:
+
+```ini
+# /etc/systemd/system/crypto-dashboard.service
+[Unit]
+Description=Crypto Preis Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/btc-price-dashboard
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Nutzung
+
+1. Startseite zeigt `BTCEUR`-Preis und Chart.
+2. **Coins** → suchen (Ticker wie `ETH`) → **+ Add**.
+3. Coin antippen → Preis und Chart wie bei BTC.
+4. Nur Paare mit echtem Binance-EUR-Markt erscheinen in der Suche.
+
+## Hinweise
+
+- Watchlist liegt in `localStorage` (Key `crypto-watchlist-v2`, pro Browser/Gerät).
+- Marktdaten (EUR-Paare, Ticker, Kerzen) werden lokal in **SQLite** gespeichert und von Binance nachgezogen.
+- Beim Seitenaufruf und gestaffelt im Hintergrund (Ticker ~1 Min, Tages-History ~15 Min, Prune ~1 Std) werden Daten nachgezogen.
+- **1-Sekunden-Kerzen** nur on-demand für „5 Min“/„15 Min“, nicht im Hintergrund; Aufbewahrung ca. 2 Stunden.
+- Chart zeigt Close-Preise aus gespeicherten Klines; Tageskerzen bleiben dauerhaft, feinere Intervalle werden periodisch bereinigt.
+- Manueller Sync (Debug): `POST /api/sync?symbols=BTCEUR` oder `POST /api/sync?full=1`.
+- Für `better-sqlite3` auf dem Server ggf. Build-Tools nötig (`build-essential` o. Ä.).
