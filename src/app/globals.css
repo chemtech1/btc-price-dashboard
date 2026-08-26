@@ -12,6 +12,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
+svg,
+canvas {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background:
     radial-gradient(1200px 600px at 10% -10%, rgba(249, 115, 22, 0.12), transparent 55%),

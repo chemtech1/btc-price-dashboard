@@ -73,7 +73,7 @@ export function PriceChart({ points, rangeId, loading, error }: Props) {
   const pad = (max - min) * 0.08 || max * 0.01;
 
   return (
-    <div className="h-[55vh] min-h-64 max-h-[28rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-96 sm:p-4">
+    <div className="h-[55vh] min-h-64 max-h-[28rem] w-full select-none rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 outline-none touch-manipulation [-webkit-tap-highlight-color:transparent] sm:h-96 sm:p-4">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={points}
@@ -107,7 +107,16 @@ export function PriceChart({ points, rangeId, loading, error }: Props) {
             stroke="#71717a"
             tick={{ fill: "#a1a1aa", fontSize: narrow ? 10 : 11 }}
           />
-          <Tooltip content={<ChartTooltip rangeId={rangeId} />} />
+          <Tooltip
+            cursor={{ stroke: "rgba(255,255,255,0.2)", strokeWidth: 1 }}
+            wrapperStyle={{
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              boxShadow: "none",
+            }}
+            content={<ChartTooltip rangeId={rangeId} />}
+          />
           <Area
             type="monotone"
             dataKey="price"

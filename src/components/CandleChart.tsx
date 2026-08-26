@@ -394,7 +394,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
   return (
     <div
       ref={wrapRef}
-      className="relative h-[58vh] min-h-64 max-h-[32rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-[26rem] sm:p-4"
+      className="relative h-[58vh] min-h-64 max-h-[32rem] w-full select-none rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 outline-none touch-manipulation [-webkit-tap-highlight-color:transparent] sm:h-[26rem] sm:p-4"
     >
       {error ? (
         <p className="absolute inset-0 z-20 flex items-center justify-center px-4 text-center text-rose-300">

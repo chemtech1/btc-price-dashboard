@@ -165,7 +165,7 @@ export function FearGreedPage() {
             )}
           </p>
         </div>
-        <div className="h-64 w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-2 sm:h-80 sm:p-4">
+        <div className="h-64 w-full select-none rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-2 outline-none touch-manipulation [-webkit-tap-highlight-color:transparent] sm:h-80 sm:p-4">
           {chartRows.length > 1 ? (
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
@@ -208,6 +208,13 @@ export function FearGreedPage() {
                   />
                 )}
                 <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  wrapperStyle={{
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    boxShadow: "none",
+                  }}
                   content={({ active, payload }) => {
                     if (!active || !payload?.[0]) return null;
                     const p = payload[0].payload as ChartRow;
