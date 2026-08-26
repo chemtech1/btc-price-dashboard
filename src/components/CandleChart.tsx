@@ -31,19 +31,26 @@ const TEXT = "#a1a1aa";
 const GRID = "rgba(255,255,255,0.06)";
 
 function priceAxisOptions(narrow: boolean) {
+  const hiddenScale = {
+    visible: false,
+    borderVisible: false,
+    ticksVisible: false,
+  };
   return {
     layout: { fontSize: narrow ? 10 : 12 },
     localization: {
       locale: "de-DE" as const,
-      priceFormatter: narrow
-        ? (price: number) => formatAxisPrice(price)
-        : (price: number) => formatEur(price, true),
+      // Compact on the overlay so labels don't cover candles; full EUR stays in OHLC.
+      priceFormatter: (price: number) => formatAxisPrice(price),
     },
-    rightPriceScale: {
-      borderColor: "rgba(255,255,255,0.08)",
+    defaultVisiblePriceScaleId: "left" as const,
+    leftPriceScale: hiddenScale,
+    rightPriceScale: hiddenScale,
+    overlayPriceScales: {
+      borderVisible: false,
+      ticksVisible: true,
+      entireTextOnly: true,
       scaleMargins: { top: 0.08, bottom: 0.08 },
-      entireTextOnly: narrow,
-      ticksVisible: false,
     },
   };
 }
@@ -96,7 +103,10 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
         vertLine: { color: "rgba(255,255,255,0.25)", width: 1 },
         horzLine: { color: "rgba(255,255,255,0.25)", width: 1 },
       },
+      defaultVisiblePriceScaleId: initialAxis.defaultVisiblePriceScaleId,
+      leftPriceScale: initialAxis.leftPriceScale,
       rightPriceScale: initialAxis.rightPriceScale,
+      overlayPriceScales: initialAxis.overlayPriceScales,
       timeScale: {
         borderColor: "rgba(255,255,255,0.08)",
         timeVisible: true,
@@ -114,6 +124,9 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
       borderDownColor: DOWN,
       wickUpColor: UP,
       wickDownColor: DOWN,
+      priceScaleId: "",
+      lastValueVisible: true,
+      priceLineVisible: true,
     });
 
     chartRef.current = chart;
