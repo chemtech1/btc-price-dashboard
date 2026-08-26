@@ -138,6 +138,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     [candles, narrow],
   );
 
+  const wrapRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -289,7 +290,17 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     });
     ro.observe(host);
 
+    const dismissIfOutside = (e: PointerEvent) => {
+      const root = wrapRef.current;
+      if (!root || root.contains(e.target as Node)) return;
+      pinnedRef.current = false;
+      setTip(null);
+      chart.clearCrosshairPosition();
+    };
+    document.addEventListener("pointerdown", dismissIfOutside, true);
+
     return () => {
+      document.removeEventListener("pointerdown", dismissIfOutside, true);
       ro.disconnect();
       chart.unsubscribeCrosshairMove(onMove);
       chart.unsubscribeClick(onClick);
@@ -304,11 +315,29 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     const chart = chartRef.current;
     if (!series || !chart) return;
     series.setData(toSeries(visible));
-    pinnedRef.current = false;
-    setTip(null);
+    if (!pinnedRef.current) {
+      setTip(null);
+    }
     requestAnimationFrame(() => {
       chart.timeScale().fitContent();
-      requestAnimationFrame(syncOverlay);
+      requestAnimationFrame(() => {
+        syncOverlay();
+        if (!pinnedRef.current || !tipRef.current) return;
+        const prev = tipRef.current;
+        const updated = visible.find((c) => c.t === prev.candle.t);
+        if (!updated) {
+          pinnedRef.current = false;
+          setTip(null);
+          chart.clearCrosshairPosition();
+          return;
+        }
+        setTip({ ...prev, candle: updated });
+        chart.setCrosshairPosition(
+          updated.close,
+          Math.floor(updated.t / 1000) as UTCTimestamp,
+          series,
+        );
+      });
     });
   }, [visible, syncOverlay]);
 
@@ -316,7 +345,10 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     Boolean(error) || (loading && candles.length === 0) || candles.length === 0;
 
   return (
-    <div className="relative h-[55vh] min-h-64 max-h-[28rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-96 sm:p-4">
+    <div
+      ref={wrapRef}
+      className="relative h-[55vh] min-h-64 max-h-[28rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-96 sm:p-4"
+    >
       {error ? (
         <p className="absolute inset-0 z-20 flex items-center justify-center px-4 text-center text-rose-300">
           {error}
