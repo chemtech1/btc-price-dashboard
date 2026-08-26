@@ -48,29 +48,18 @@ Lauscht auf `0.0.0.0:3000` → `http://<SERVER-IP>:3000`
 ## Deploy auf Proxmox (Kurzfassung)
 
 1. LXC/VM mit Node.js 20+ und LAN-IP.
-2. Projekt bauen (`npm ci && npm run build`).
-3. `npm start` oder systemd-Unit (WorkingDirectory auf das Projekt, `ExecStart=/usr/bin/npm start`).
+2. Projekt unter `/data/btc-price-dashboard` bauen (`npm ci && npm run build`).
+3. systemd-Unit aus `deploy/crypto-dashboard.service` (User `root`, WorkingDirectory `/data/btc-price-dashboard`).
 4. Port **3000/tcp** freigeben.
 5. Zugriff: `http://<LXC-oder-VM-IP>:3000`
 
-Beispiel-Unit:
-
-```ini
-# /etc/systemd/system/crypto-dashboard.service
-[Unit]
-Description=Crypto Preis Dashboard
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/btc-price-dashboard
-ExecStart=/usr/bin/npm start
-Restart=on-failure
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
+```bash
+cp /data/btc-price-dashboard/deploy/crypto-dashboard.service /etc/systemd/system/crypto-dashboard.service
+# Falls npm start noch im Terminal läuft: stoppen (Port 3000)
+# which npm  →  bei nvm/fnm ExecStart in der Unit auf den vollen Pfad setzen
+systemctl daemon-reload
+systemctl enable --now crypto-dashboard.service
+systemctl status crypto-dashboard.service
 ```
 
 ## Nutzung

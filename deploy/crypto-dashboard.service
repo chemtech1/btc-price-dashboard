@@ -1,0 +1,20 @@
+[Unit]
+Description=Crypto Preis Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/data/btc-price-dashboard
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+# Optional:
+# Environment=CRYPTO_DB_PATH=/data/btc-price-dashboard/data/crypto.db
+# Environment=BINANCE_API_BASE=https://data-api.binance.vision
+
+[Install]
+WantedBy=multi-user.target
