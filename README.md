@@ -8,7 +8,7 @@ Next.js-Webapp für aktuelle Krypto-Preise in **EUR** und historischen Verlauf a
 - Weitere Coins über das **Coins-Menü** (Watchlist auf dem Server, alle Geräte)
 - Verlauf: Umschalter **Linie** / **Kerzen**
 - Linie: 5 Min, 15 Min (1s), 1 Std, Tag, Woche, Monat, 6 Monate, Jahr, Alles
-- Kerzen: Intervalle **1m · 5m · 15m · 30m · 1h · 5h · 1D · 1W · 1M** (**60** Kerzen am PC, **40** am Handy; `5h` aus 1h aggregiert)
+- Kerzen: Intervalle **1m · 5m · 15m · 30m · 1h · 5h · 1D · 1W · 1M** (**60** Kerzen am PC, **30** am Handy; `5h` aus 1h aggregiert)
 - Kerzen-Live-Update: **1 Sekunde** in jeder Ansicht
 
 ## Voraussetzungen

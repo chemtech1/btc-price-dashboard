@@ -22,7 +22,7 @@ export type CandleRangeConfig = {
 
 /** Visible candles: desktop 60, smartphone 40. Poll 1s. */
 export const CANDLE_LIMIT = 60;
-export const CANDLE_LIMIT_MOBILE = 40;
+export const CANDLE_LIMIT_MOBILE = 30;
 export const CANDLE_LIVE_POLL_MS = 1_000;
 
 export const CANDLE_RANGES: CandleRangeConfig[] = [
