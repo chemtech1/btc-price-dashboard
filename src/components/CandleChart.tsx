@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -30,29 +30,22 @@ const DOWN = "#ef5350";
 const TEXT = "#a1a1aa";
 const GRID = "rgba(255,255,255,0.06)";
 
-function priceAxisOptions(narrow: boolean) {
-  const hiddenScale = {
-    visible: false,
-    borderVisible: false,
-    ticksVisible: false,
-  };
-  return {
-    layout: { fontSize: narrow ? 10 : 12 },
-    localization: {
-      locale: "de-DE" as const,
-      // Compact on the overlay so labels don't cover candles; full EUR stays in OHLC.
-      priceFormatter: (price: number) => formatAxisPrice(price),
-    },
-    defaultVisiblePriceScaleId: "left" as const,
-    leftPriceScale: hiddenScale,
-    rightPriceScale: hiddenScale,
-    overlayPriceScales: {
-      borderVisible: false,
-      ticksVisible: true,
-      entireTextOnly: true,
-      scaleMargins: { top: 0.08, bottom: 0.08 },
-    },
-  };
+type AxisTick = { price: number; y: number };
+
+function makeTicks(min: number, max: number, count: number): number[] {
+  const span = max - min || Math.abs(max) * 0.01 || 1;
+  const lo = min - span * 0.08;
+  const hi = max + span * 0.08;
+  const raw = (hi - lo) / count;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step =
+    ([1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? raw) || 1;
+  const start = Math.ceil(lo / step) * step;
+  const ticks: number[] = [];
+  for (let v = start; v <= hi + step * 0.001; v += step) {
+    ticks.push(v);
+  }
+  return ticks;
 }
 
 function toSeries(candles: CandlePoint[]): CandlestickData<Time>[] {
@@ -78,13 +71,51 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const candlesRef = useRef(candles);
+  candlesRef.current = candles;
+
   const [hover, setHover] = useState<CandlePoint | null>(null);
+  const [ticks, setTicks] = useState<AxisTick[]>([]);
+  const [lastMark, setLastMark] = useState<{
+    y: number;
+    price: number;
+    bullish: boolean;
+  } | null>(null);
+
+  const syncOverlay = useCallback(() => {
+    const series = seriesRef.current;
+    const data = candlesRef.current;
+    if (!series || data.length === 0) {
+      setTicks([]);
+      setLastMark(null);
+      return;
+    }
+    const min = Math.min(...data.map((c) => c.low));
+    const max = Math.max(...data.map((c) => c.high));
+    const nextTicks: AxisTick[] = [];
+    for (const price of makeTicks(min, max, 5)) {
+      const y = series.priceToCoordinate(price);
+      if (y == null || !Number.isFinite(y)) continue;
+      nextTicks.push({ price, y });
+    }
+    setTicks(nextTicks);
+    const last = data[data.length - 1];
+    const y = series.priceToCoordinate(last.close);
+    if (y == null || !Number.isFinite(y)) {
+      setLastMark(null);
+      return;
+    }
+    setLastMark({
+      y,
+      price: last.close,
+      bullish: last.close >= last.open,
+    });
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
 
-    const initialAxis = priceAxisOptions(true);
     const chart = createChart(host, {
       autoSize: true,
       layout: {
@@ -92,7 +123,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
         textColor: TEXT,
         fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
         attributionLogo: false,
-        fontSize: initialAxis.layout.fontSize,
+        fontSize: 10,
       },
       grid: {
         vertLines: { visible: false },
@@ -103,16 +134,17 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
         vertLine: { color: "rgba(255,255,255,0.25)", width: 1 },
         horzLine: { color: "rgba(255,255,255,0.25)", width: 1 },
       },
-      defaultVisiblePriceScaleId: initialAxis.defaultVisiblePriceScaleId,
-      leftPriceScale: initialAxis.leftPriceScale,
-      rightPriceScale: initialAxis.rightPriceScale,
-      overlayPriceScales: initialAxis.overlayPriceScales,
+      leftPriceScale: { visible: false, borderVisible: false },
+      rightPriceScale: { visible: false, borderVisible: false },
       timeScale: {
         borderColor: "rgba(255,255,255,0.08)",
         timeVisible: true,
         secondsVisible: false,
       },
-      localization: initialAxis.localization,
+      localization: {
+        locale: "de-DE",
+        priceFormatter: (price: number) => formatAxisPrice(price),
+      },
       handleScroll: false,
       handleScale: false,
     });
@@ -125,8 +157,8 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
       wickUpColor: UP,
       wickDownColor: DOWN,
       priceScaleId: "",
-      lastValueVisible: true,
-      priceLineVisible: true,
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
 
     chartRef.current = chart;
@@ -152,22 +184,19 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
 
     chart.subscribeCrosshairMove(onMove);
 
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(syncOverlay);
+    });
+    ro.observe(host);
+
     return () => {
+      ro.disconnect();
       chart.unsubscribeCrosshairMove(onMove);
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
     };
-  }, []);
-
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    chart.applyOptions(priceAxisOptions(narrow));
-    requestAnimationFrame(() => {
-      chart.timeScale().fitContent();
-    });
-  }, [narrow]);
+  }, [syncOverlay]);
 
   useEffect(() => {
     const series = seriesRef.current;
@@ -176,9 +205,10 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     series.setData(toSeries(candles));
     requestAnimationFrame(() => {
       chart.timeScale().fitContent();
+      requestAnimationFrame(syncOverlay);
     });
     setHover(null);
-  }, [candles]);
+  }, [candles, syncOverlay]);
 
   const shown = hover ?? candles[candles.length - 1];
   const bullish = shown ? shown.close >= shown.open : false;
@@ -212,7 +242,47 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
           Keine Kerzendaten für dieses Intervall.
         </p>
       ) : null}
-      <div ref={hostRef} className="h-full w-full" />
+      <div className="relative h-full w-full">
+        <div ref={hostRef} className="h-full w-full" />
+        {!showStatus && (
+          <div className="pointer-events-none absolute inset-0 z-[5] overflow-hidden">
+            {ticks.map((tick) => (
+              <span
+                key={tick.price}
+                className="absolute left-1 -translate-y-1/2 text-[10px] text-zinc-400 sm:left-2 sm:text-[11px]"
+                style={{
+                  top: tick.y,
+                  textShadow: "0 1px 2px rgba(0,0,0,0.85)",
+                }}
+              >
+                {formatAxisPrice(tick.price)}
+              </span>
+            ))}
+            {lastMark && (
+              <>
+                <div
+                  className="absolute right-0 left-0 border-t border-dashed opacity-70"
+                  style={{
+                    top: lastMark.y,
+                    borderColor: lastMark.bullish ? UP : DOWN,
+                  }}
+                />
+                <span
+                  className="absolute left-1 -translate-y-1/2 rounded px-1 py-0.5 text-[10px] font-medium text-black sm:left-2 sm:text-[11px]"
+                  style={{
+                    top: lastMark.y,
+                    background: lastMark.bullish ? UP : DOWN,
+                  }}
+                >
+                  {narrow
+                    ? formatAxisPrice(lastMark.price)
+                    : formatEur(lastMark.price, true)}
+                </span>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
