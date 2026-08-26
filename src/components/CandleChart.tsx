@@ -14,8 +14,9 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { CandleIntervalId } from "../lib/candle-ranges";
-import { formatCandleTooltipTime, formatEur } from "../lib/format";
+import { formatAxisPrice, formatCandleTooltipTime, formatEur } from "../lib/format";
 import type { CandlePoint } from "../lib/types";
+import { useNarrow } from "../lib/use-narrow";
 
 type Props = {
   candles: CandlePoint[];
@@ -28,6 +29,24 @@ const UP = "#26a69a";
 const DOWN = "#ef5350";
 const TEXT = "#a1a1aa";
 const GRID = "rgba(255,255,255,0.06)";
+
+function priceAxisOptions(narrow: boolean) {
+  return {
+    layout: { fontSize: narrow ? 10 : 12 },
+    localization: {
+      locale: "de-DE" as const,
+      priceFormatter: narrow
+        ? (price: number) => formatAxisPrice(price)
+        : (price: number) => formatEur(price, true),
+    },
+    rightPriceScale: {
+      borderColor: "rgba(255,255,255,0.08)",
+      scaleMargins: { top: 0.08, bottom: 0.08 },
+      entireTextOnly: narrow,
+      ticksVisible: false,
+    },
+  };
+}
 
 function toSeries(candles: CandlePoint[]): CandlestickData<Time>[] {
   const out: CandlestickData<Time>[] = [];
@@ -48,6 +67,7 @@ function toSeries(candles: CandlePoint[]): CandlestickData<Time>[] {
 }
 
 export function CandleChart({ candles, intervalId, loading, error }: Props) {
+  const narrow = useNarrow();
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -57,6 +77,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     const host = hostRef.current;
     if (!host) return;
 
+    const initialAxis = priceAxisOptions(true);
     const chart = createChart(host, {
       autoSize: true,
       layout: {
@@ -64,6 +85,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
         textColor: TEXT,
         fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
         attributionLogo: false,
+        fontSize: initialAxis.layout.fontSize,
       },
       grid: {
         vertLines: { visible: false },
@@ -74,19 +96,13 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
         vertLine: { color: "rgba(255,255,255,0.25)", width: 1 },
         horzLine: { color: "rgba(255,255,255,0.25)", width: 1 },
       },
-      rightPriceScale: {
-        borderColor: "rgba(255,255,255,0.08)",
-        scaleMargins: { top: 0.08, bottom: 0.08 },
-      },
+      rightPriceScale: initialAxis.rightPriceScale,
       timeScale: {
         borderColor: "rgba(255,255,255,0.08)",
         timeVisible: true,
         secondsVisible: false,
       },
-      localization: {
-        locale: "de-DE",
-        priceFormatter: (price: number) => formatEur(price, true),
-      },
+      localization: initialAxis.localization,
       handleScroll: false,
       handleScale: false,
     });
@@ -130,6 +146,15 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
       seriesRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.applyOptions(priceAxisOptions(narrow));
+    requestAnimationFrame(() => {
+      chart.timeScale().fitContent();
+    });
+  }, [narrow]);
 
   useEffect(() => {
     const series = seriesRef.current;
