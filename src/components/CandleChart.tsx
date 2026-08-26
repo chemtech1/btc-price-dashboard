@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CandlestickSeries,
   ColorType,
   CrosshairMode,
+  LineStyle,
   createChart,
   type CandlestickData,
   type IChartApi,
@@ -13,7 +14,10 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import type { CandleIntervalId } from "../lib/candle-ranges";
+import {
+  CANDLE_LIMIT_MOBILE,
+  type CandleIntervalId,
+} from "../lib/candle-ranges";
 import { formatAxisPrice, formatCandleTooltipTime, formatEur } from "../lib/format";
 import type { CandlePoint } from "../lib/types";
 import { useNarrow } from "../lib/use-narrow";
@@ -29,8 +33,10 @@ const UP = "#26a69a";
 const DOWN = "#ef5350";
 const TEXT = "#a1a1aa";
 const GRID = "rgba(255,255,255,0.06)";
+const HAIR = "#60a5fa";
 
 type AxisTick = { price: number; y: number };
+type Tip = { candle: CandlePoint; x: number; y: number };
 
 function makeTicks(min: number, max: number, count: number): number[] {
   const span = max - min || Math.abs(max) * 0.01 || 1;
@@ -66,21 +72,89 @@ function toSeries(candles: CandlePoint[]): CandlestickData<Time>[] {
   return out;
 }
 
+function barFromParam(
+  param: MouseEventParams<Time>,
+  series: ISeriesApi<"Candlestick">,
+): CandlePoint | null {
+  const raw = param.seriesData.get(series) as CandlestickData<Time> | undefined;
+  if (!raw || typeof raw.time !== "number") return null;
+  return {
+    t: raw.time * 1000,
+    open: raw.open,
+    high: raw.high,
+    low: raw.low,
+    close: raw.close,
+    volume: 0,
+  };
+}
+
+function CandleTipBox({
+  tip,
+  intervalId,
+  hostWidth,
+}: {
+  tip: Tip;
+  intervalId: CandleIntervalId;
+  hostWidth: number;
+}) {
+  const c = tip.candle;
+  const up = c.close >= c.open;
+  const boxW = 184;
+  let left = tip.x + 12;
+  if (left + boxW > hostWidth - 8) left = Math.max(8, tip.x - boxW - 8);
+  const top = Math.max(8, tip.y - 72);
+  return (
+    <div
+      className="pointer-events-none absolute z-20 min-w-[11.5rem] rounded-lg border border-white/15 bg-zinc-900/95 px-3 py-2 text-xs shadow-xl"
+      style={{ left, top }}
+    >
+      <p className="mb-1 text-zinc-400">{formatCandleTooltipTime(c.t, intervalId)}</p>
+      <p className="flex justify-between gap-4 text-zinc-300">
+        <span>Eröffn.</span>
+        <span>{formatEur(c.open)}</span>
+      </p>
+      <p className="flex justify-between gap-4 text-zinc-300">
+        <span>Hoch</span>
+        <span>{formatEur(c.high)}</span>
+      </p>
+      <p className="flex justify-between gap-4 text-zinc-300">
+        <span>Tief</span>
+        <span>{formatEur(c.low)}</span>
+      </p>
+      <p
+        className={`flex justify-between gap-4 font-medium ${up ? "text-teal-400" : "text-red-400"}`}
+      >
+        <span>Schließen</span>
+        <span>{formatEur(c.close)}</span>
+      </p>
+    </div>
+  );
+}
+
 export function CandleChart({ candles, intervalId, loading, error }: Props) {
   const narrow = useNarrow();
+  const visible = useMemo(
+    () => (narrow ? candles.slice(-CANDLE_LIMIT_MOBILE) : candles),
+    [candles, narrow],
+  );
+
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const candlesRef = useRef(candles);
-  candlesRef.current = candles;
+  const candlesRef = useRef(visible);
+  candlesRef.current = visible;
+  const pinnedRef = useRef(false);
+  const tipRef = useRef<Tip | null>(null);
 
-  const [hover, setHover] = useState<CandlePoint | null>(null);
+  const [tip, setTip] = useState<Tip | null>(null);
   const [ticks, setTicks] = useState<AxisTick[]>([]);
   const [lastMark, setLastMark] = useState<{
     y: number;
     price: number;
     bullish: boolean;
   } | null>(null);
+
+  tipRef.current = tip;
 
   const syncOverlay = useCallback(() => {
     const series = seriesRef.current;
@@ -130,9 +204,19 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
         horzLines: { color: GRID },
       },
       crosshair: {
-        mode: CrosshairMode.Normal,
-        vertLine: { color: "rgba(255,255,255,0.25)", width: 1 },
-        horzLine: { color: "rgba(255,255,255,0.25)", width: 1 },
+        mode: CrosshairMode.MagnetOHLC,
+        vertLine: {
+          color: HAIR,
+          width: 1,
+          style: LineStyle.Dashed,
+          labelVisible: false,
+        },
+        horzLine: {
+          color: HAIR,
+          width: 1,
+          style: LineStyle.Dashed,
+          labelVisible: false,
+        },
       },
       leftPriceScale: { visible: false, borderVisible: false },
       rightPriceScale: { visible: false, borderVisible: false },
@@ -165,24 +249,40 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     seriesRef.current = series;
 
     const onMove = (param: MouseEventParams<Time>) => {
-      const raw = param.seriesData.get(series) as
-        | CandlestickData<Time>
-        | undefined;
-      if (!raw || typeof raw.time !== "number") {
-        setHover(null);
+      if (pinnedRef.current) return;
+      const bar = barFromParam(param, series);
+      if (!bar || !param.point) {
+        setTip(null);
         return;
       }
-      setHover({
-        t: raw.time * 1000,
-        open: raw.open,
-        high: raw.high,
-        low: raw.low,
-        close: raw.close,
-        volume: 0,
-      });
+      setTip({ candle: bar, x: param.point.x, y: param.point.y });
+    };
+
+    const onClick = (param: MouseEventParams<Time>) => {
+      const bar = barFromParam(param, series);
+      if (!bar || !param.point) {
+        pinnedRef.current = false;
+        setTip(null);
+        chart.clearCrosshairPosition();
+        return;
+      }
+      if (pinnedRef.current && tipRef.current?.candle.t === bar.t) {
+        pinnedRef.current = false;
+        setTip(null);
+        chart.clearCrosshairPosition();
+        return;
+      }
+      pinnedRef.current = true;
+      setTip({ candle: bar, x: param.point.x, y: param.point.y });
+      chart.setCrosshairPosition(
+        bar.close,
+        Math.floor(bar.t / 1000) as UTCTimestamp,
+        series,
+      );
     };
 
     chart.subscribeCrosshairMove(onMove);
+    chart.subscribeClick(onClick);
 
     const ro = new ResizeObserver(() => {
       requestAnimationFrame(syncOverlay);
@@ -192,6 +292,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     return () => {
       ro.disconnect();
       chart.unsubscribeCrosshairMove(onMove);
+      chart.unsubscribeClick(onClick);
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -202,33 +303,20 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
     const series = seriesRef.current;
     const chart = chartRef.current;
     if (!series || !chart) return;
-    series.setData(toSeries(candles));
+    series.setData(toSeries(visible));
+    pinnedRef.current = false;
+    setTip(null);
     requestAnimationFrame(() => {
       chart.timeScale().fitContent();
       requestAnimationFrame(syncOverlay);
     });
-    setHover(null);
-  }, [candles, syncOverlay]);
+  }, [visible, syncOverlay]);
 
-  const shown = hover ?? candles[candles.length - 1];
-  const bullish = shown ? shown.close >= shown.open : false;
-  const showStatus = Boolean(error) || (loading && candles.length === 0) || candles.length === 0;
+  const showStatus =
+    Boolean(error) || (loading && candles.length === 0) || candles.length === 0;
 
   return (
     <div className="relative h-[55vh] min-h-64 max-h-[28rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-96 sm:p-4">
-      {shown && !showStatus && (
-        <p className="pointer-events-none absolute left-3 top-3 z-10 max-w-[calc(100%-5rem)] truncate text-[11px] text-zinc-400 sm:left-6 sm:top-5 sm:text-xs">
-          <span className="text-zinc-500">
-            {formatCandleTooltipTime(shown.t, intervalId)}
-          </span>{" "}
-          <span className="text-zinc-500">O</span> {formatEur(shown.open)}{" "}
-          <span className="text-zinc-500">H</span> {formatEur(shown.high)}{" "}
-          <span className="text-zinc-500">L</span> {formatEur(shown.low)}{" "}
-          <span className={bullish ? "text-teal-400" : "text-red-400"}>
-            C {formatEur(shown.close)}
-          </span>
-        </p>
-      )}
       {error ? (
         <p className="absolute inset-0 z-20 flex items-center justify-center px-4 text-center text-rose-300">
           {error}
@@ -281,6 +369,13 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
               </>
             )}
           </div>
+        )}
+        {!showStatus && tip && (
+          <CandleTipBox
+            tip={tip}
+            intervalId={intervalId}
+            hostWidth={hostRef.current?.clientWidth ?? 320}
+          />
         )}
       </div>
     </div>

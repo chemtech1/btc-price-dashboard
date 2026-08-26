@@ -20,8 +20,9 @@ export type CandleRangeConfig = {
   sourceFactor?: number;
 };
 
-/** Always 60 candles; poll/tip refresh is 1s for every interval. */
+/** Visible candles: desktop 60, smartphone 40. Poll 1s. */
 export const CANDLE_LIMIT = 60;
+export const CANDLE_LIMIT_MOBILE = 40;
 export const CANDLE_LIVE_POLL_MS = 1_000;
 
 export const CANDLE_RANGES: CandleRangeConfig[] = [
