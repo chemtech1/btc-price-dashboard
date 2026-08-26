@@ -1,3 +1,4 @@
+import { coinDisplayName } from "./coin-names";
 import type { RangeId } from "./ranges";
 import type { CoinPrice, EurPair, HistoryPoint, SearchResult } from "./types";
 
@@ -226,10 +227,13 @@ export function scoreSearch(query: string, pairs: EurPair[]): SearchResult[] {
     .map((p) => {
       const base = p.baseAsset.toUpperCase();
       const sym = p.symbol.toUpperCase();
+      const name = coinDisplayName(p.baseAsset).toUpperCase();
       let score = 0;
       if (base === q || sym === q || sym === `${q}EUR`) score = 100;
+      else if (name === q) score = 95;
       else if (base.startsWith(q) || sym.startsWith(q)) score = 80;
-      else if (base.includes(q) || sym.includes(q)) score = 40;
+      else if (name.startsWith(q)) score = 70;
+      else if (base.includes(q) || sym.includes(q) || name.includes(q)) score = 40;
       else return null;
       return { pair: p, score };
     })
@@ -238,7 +242,7 @@ export function scoreSearch(query: string, pairs: EurPair[]): SearchResult[] {
     .slice(0, 20)
     .map(({ pair }) => ({
       id: pair.symbol,
-      name: pair.baseAsset,
+      name: coinDisplayName(pair.baseAsset),
       symbol: pair.baseAsset,
       thumb: "",
       market_cap_rank: null,
