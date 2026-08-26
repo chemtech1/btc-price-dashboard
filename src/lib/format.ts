@@ -100,17 +100,17 @@ export function formatTooltipTime(timestamp: number, rangeId: string): string {
   });
 }
 
-/** Tick/tooltip labels for candlestick intervals (10s…1d). */
+/** Tick labels for candlestick intervals. */
 export function formatCandleTick(timestamp: number, intervalId: string): string {
   const d = new Date(timestamp);
-  if (intervalId === "10s") {
-    return d.toLocaleTimeString("de-DE", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  }
-  if (intervalId === "1m" || intervalId === "5m" || intervalId === "15m") {
+  if (
+    intervalId === "1m" ||
+    intervalId === "5m" ||
+    intervalId === "15m" ||
+    intervalId === "30m" ||
+    intervalId === "1h" ||
+    intervalId === "5h"
+  ) {
     return d.toLocaleString("de-DE", {
       day: "2-digit",
       month: "2-digit",
@@ -118,34 +118,25 @@ export function formatCandleTick(timestamp: number, intervalId: string): string 
       minute: "2-digit",
     });
   }
-  if (intervalId === "1h" || intervalId === "4h") {
-    return d.toLocaleString("de-DE", {
+  if (intervalId === "1d" || intervalId === "1w") {
+    return d.toLocaleDateString("de-DE", {
       day: "2-digit",
       month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
     });
   }
-  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  return d.toLocaleDateString("de-DE", {
+    month: "short",
+    year: "2-digit",
+  });
 }
 
 export function formatCandleTooltipTime(timestamp: number, intervalId: string): string {
   const d = new Date(timestamp);
-  if (intervalId === "1d") {
+  if (intervalId === "1d" || intervalId === "1w" || intervalId === "1M") {
     return d.toLocaleDateString("de-DE", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-    });
-  }
-  if (intervalId === "10s") {
-    return d.toLocaleString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
     });
   }
   return d.toLocaleString("de-DE", {

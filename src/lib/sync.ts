@@ -293,20 +293,28 @@ export async function ensureCandles(
     } catch (err) {
       const staleSource = getCandles(symbol, sourceInterval, sourceLimit);
       if (staleSource.length === 0) throw err;
-      if (range.aggregateMs) {
-        return aggregateOhlc(staleSource, range.aggregateMs).slice(-range.limit);
-      }
-      const intervalMs = INTERVAL_MS[sourceInterval] ?? 60_000;
-      return fillCandleGaps(staleSource.slice(-range.limit), intervalMs);
+      return candlesFromSource(staleSource, range);
     }
   }
 
   const source = getCandles(symbol, sourceInterval, sourceLimit);
+  return candlesFromSource(source, range);
+}
+
+function candlesFromSource(
+  source: CandlePoint[],
+  range: NonNullable<ReturnType<typeof getCandleRange>>,
+): CandlePoint[] {
   if (range.aggregateMs) {
     return aggregateOhlc(source, range.aggregateMs).slice(-range.limit);
   }
-  const intervalMs = INTERVAL_MS[sourceInterval] ?? 60_000;
-  return fillCandleGaps(source.slice(-range.limit), intervalMs);
+  const sliced = source.slice(-range.limit);
+  // Weekly/monthly Binance candles are calendar-aligned; do not pad 7d/30d holes.
+  if (range.sourceInterval === "1w" || range.sourceInterval === "1M") {
+    return sliced;
+  }
+  const intervalMs = INTERVAL_MS[range.sourceInterval] ?? 60_000;
+  return fillCandleGaps(sliced, intervalMs);
 }
 
 export async function searchCoins(query: string): Promise<SearchResult[]> {

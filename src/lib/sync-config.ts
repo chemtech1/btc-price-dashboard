@@ -31,13 +31,14 @@ export const BG_PRUNE_EVERY_MS = 60 * 60 * 1000;
 
 /** How long to keep klines per candle interval (not UI range id). */
 export const KLINE_RETENTION_MS: Record<string, number> = {
-  "1s": 2 * 60 * 60 * 1000, // 2 hours
+  "1s": 2 * 60 * 60 * 1000, // 2 hours (line-chart live ranges)
   "1m": 2 * 24 * 60 * 60 * 1000, // 2 days
-  "5m": 14 * 24 * 60 * 60 * 1000, // 14 days
-  "15m": 30 * 24 * 60 * 60 * 1000, // 30 days
-  "1h": 90 * 24 * 60 * 60 * 1000, // 90 days
-  "4h": 365 * 24 * 60 * 60 * 1000, // 1 year
-  // "1d" unlimited — omitted on purpose
+  "5m": 2 * 24 * 60 * 60 * 1000,
+  "15m": 3 * 24 * 60 * 60 * 1000,
+  "30m": 5 * 24 * 60 * 60 * 1000,
+  "1h": 21 * 24 * 60 * 60 * 1000, // 5h window needs ~2 weeks of 1h
+  "4h": 365 * 24 * 60 * 60 * 1000,
+  // "1d" / "1w" / "1M" unlimited — omitted on purpose
 };
 
 export const INTERVAL_MS: Record<string, number> = {
@@ -45,9 +46,13 @@ export const INTERVAL_MS: Record<string, number> = {
   "1m": 60_000,
   "5m": 5 * 60_000,
   "15m": 15 * 60_000,
+  "30m": 30 * 60_000,
   "1h": 60 * 60_000,
   "4h": 4 * 60 * 60_000,
+  "5h": 5 * 60 * 60_000,
   "1d": 24 * 60 * 60_000,
+  "1w": 7 * 24 * 60 * 60_000,
+  "1M": 30 * 24 * 60 * 60_000,
 };
 
 export const META_BG_HISTORY_AT = "bg_history_at";

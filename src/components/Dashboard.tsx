@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   candlePollMs,
@@ -16,7 +17,6 @@ import {
   saveActiveCoinId,
   saveWatchlist,
 } from "../lib/watchlist";
-import { CandleChart } from "./CandleChart";
 import { CandleIntervalSelector } from "./CandleIntervalSelector";
 import { ChartModeToggle, type ChartMode } from "./ChartModeToggle";
 import { CoinMenu } from "./CoinMenu";
@@ -24,7 +24,12 @@ import { PriceChart } from "./PriceChart";
 import { PriceHeader } from "./PriceHeader";
 import { RangeSelector } from "./RangeSelector";
 
-const CANDLE_INTERVAL_KEY = "crypto-candle-interval-v1";
+const CandleChart = dynamic(
+  () => import("./CandleChart").then((m) => ({ default: m.CandleChart })),
+  { ssr: false },
+);
+
+const CANDLE_INTERVAL_KEY = "crypto-candle-interval-v2";
 const CHART_MODE_KEY = "crypto-chart-mode-v1";
 
 function loadChartMode(): ChartMode {

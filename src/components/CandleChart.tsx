@@ -1,21 +1,21 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
-  Bar,
-  BarChart,
-  Cell,
-  ErrorBar,
-  CartesianGrid,
-  Rectangle,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+  CandlestickSeries,
+  ColorType,
+  CrosshairMode,
+  createChart,
+  type CandlestickData,
+  type IChartApi,
+  type ISeriesApi,
+  type MouseEventParams,
+  type Time,
+  type UTCTimestamp,
+} from "lightweight-charts";
 import type { CandleIntervalId } from "../lib/candle-ranges";
-import { formatAxisPrice, formatCandleTick, formatCandleTooltipTime, formatEur } from "../lib/format";
+import { formatCandleTooltipTime, formatEur } from "../lib/format";
 import type { CandlePoint } from "../lib/types";
-import { useNarrow } from "../lib/use-narrow";
 
 type Props = {
   candles: CandlePoint[];
@@ -24,163 +24,157 @@ type Props = {
   error: string | null;
 };
 
-type CandleRow = CandlePoint & {
-  body: [number, number];
-  wick: [number, number];
-  bullish: boolean;
-};
+const UP = "#26a69a";
+const DOWN = "#ef5350";
+const TEXT = "#a1a1aa";
+const GRID = "rgba(255,255,255,0.06)";
 
-function toRows(candles: CandlePoint[], priceEps: number): CandleRow[] {
-  return candles.map((c) => {
-    let bodyLow = Math.min(c.open, c.close);
-    let bodyHigh = Math.max(c.open, c.close);
-    // Doji / flat: give the body a tiny value range so Recharts renders a visible bar
-    if (bodyHigh - bodyLow < priceEps) {
-      const mid = (bodyLow + bodyHigh) / 2;
-      bodyLow = mid - priceEps / 2;
-      bodyHigh = mid + priceEps / 2;
-    }
-    return {
-      ...c,
-      body: [bodyLow, bodyHigh],
-      // ErrorBar offsets from the top of the body (bodyHigh)
-      wick: [bodyHigh - c.low, c.high - bodyHigh],
-      bullish: c.close >= c.open,
-    };
-  });
-}
-
-function CandleTooltip({
-  active,
-  payload,
-  intervalId,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: CandleRow }>;
-  intervalId: CandleIntervalId;
-}) {
-  if (!active || !payload?.[0]) return null;
-  const c = payload[0].payload;
-  return (
-    <div className="rounded-lg border border-white/10 bg-zinc-900/95 px-3 py-2 text-sm shadow-xl">
-      <p className="text-zinc-400">{formatCandleTooltipTime(c.t, intervalId)}</p>
-      <p className="text-zinc-300">O {formatEur(c.open)}</p>
-      <p className="text-zinc-300">H {formatEur(c.high)}</p>
-      <p className="text-zinc-300">L {formatEur(c.low)}</p>
-      <p className={`font-semibold ${c.bullish ? "text-emerald-400" : "text-rose-400"}`}>
-        C {formatEur(c.close)}
-      </p>
-    </div>
-  );
-}
-
-function CandleBody(props: {
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  payload?: CandleRow;
-}) {
-  const color = props.payload?.bullish ? "#34d399" : "#fb7185";
-  return (
-    <Rectangle
-      x={props.x}
-      y={props.y}
-      width={props.width}
-      height={Math.max(props.height ?? 0, 2)}
-      fill={color}
-      stroke={color}
-    />
-  );
+function toSeries(candles: CandlePoint[]): CandlestickData<Time>[] {
+  const out: CandlestickData<Time>[] = [];
+  let lastTime = -1;
+  for (const c of candles) {
+    const time = Math.floor(c.t / 1000) as UTCTimestamp;
+    if (time <= lastTime) continue;
+    lastTime = time;
+    out.push({
+      time,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+    });
+  }
+  return out;
 }
 
 export function CandleChart({ candles, intervalId, loading, error }: Props) {
-  const narrow = useNarrow();
+  const hostRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const [hover, setHover] = useState<CandlePoint | null>(null);
 
-  if (error) {
-    return (
-      <div className="flex h-[55vh] min-h-64 max-h-[28rem] items-center justify-center rounded-2xl border border-rose-500/30 bg-rose-500/5 px-4 text-center text-rose-300 sm:h-96">
-        {error}
-      </div>
-    );
-  }
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
 
-  if (loading && candles.length === 0) {
-    return (
-      <div className="flex h-[55vh] min-h-64 max-h-[28rem] items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-zinc-400 sm:h-96">
-        Kerzen werden geladen…
-      </div>
-    );
-  }
+    const chart = createChart(host, {
+      autoSize: true,
+      layout: {
+        background: { type: ColorType.Solid, color: "transparent" },
+        textColor: TEXT,
+        fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
+        attributionLogo: false,
+      },
+      grid: {
+        vertLines: { visible: false },
+        horzLines: { color: GRID },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: "rgba(255,255,255,0.25)", width: 1 },
+        horzLine: { color: "rgba(255,255,255,0.25)", width: 1 },
+      },
+      rightPriceScale: {
+        borderColor: "rgba(255,255,255,0.08)",
+        scaleMargins: { top: 0.08, bottom: 0.08 },
+      },
+      timeScale: {
+        borderColor: "rgba(255,255,255,0.08)",
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      localization: {
+        locale: "de-DE",
+        priceFormatter: (price: number) => formatEur(price, true),
+      },
+      handleScroll: false,
+      handleScale: false,
+    });
 
-  if (candles.length === 0) {
-    return (
-      <div className="flex h-[55vh] min-h-64 max-h-[28rem] items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-zinc-400 sm:h-96">
-        Keine Kerzendaten für dieses Intervall.
-      </div>
-    );
-  }
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: UP,
+      downColor: DOWN,
+      borderUpColor: UP,
+      borderDownColor: DOWN,
+      wickUpColor: UP,
+      wickDownColor: DOWN,
+    });
 
-  const lows = candles.map((c) => c.low);
-  const highs = candles.map((c) => c.high);
-  const min = Math.min(...lows);
-  const max = Math.max(...highs);
-  const span = max - min || max * 0.01 || 1;
-  const pad = span * 0.08;
-  const priceEps = span * 0.004;
-  const rows = toRows(candles, priceEps);
+    chartRef.current = chart;
+    seriesRef.current = series;
+
+    const onMove = (param: MouseEventParams<Time>) => {
+      const raw = param.seriesData.get(series) as
+        | CandlestickData<Time>
+        | undefined;
+      if (!raw || typeof raw.time !== "number") {
+        setHover(null);
+        return;
+      }
+      setHover({
+        t: raw.time * 1000,
+        open: raw.open,
+        high: raw.high,
+        low: raw.low,
+        close: raw.close,
+        volume: 0,
+      });
+    };
+
+    chart.subscribeCrosshairMove(onMove);
+
+    return () => {
+      chart.unsubscribeCrosshairMove(onMove);
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const series = seriesRef.current;
+    const chart = chartRef.current;
+    if (!series || !chart) return;
+    series.setData(toSeries(candles));
+    requestAnimationFrame(() => {
+      chart.timeScale().fitContent();
+    });
+    setHover(null);
+  }, [candles]);
+
+  const shown = hover ?? candles[candles.length - 1];
+  const bullish = shown ? shown.close >= shown.open : false;
+  const showStatus = Boolean(error) || (loading && candles.length === 0) || candles.length === 0;
 
   return (
-    <div className="h-[55vh] min-h-64 max-h-[28rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-96 sm:p-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={rows}
-          margin={{ top: 8, right: 4, left: narrow ? 0 : 4, bottom: 0 }}
-        >
-          <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-          <XAxis
-            dataKey="t"
-            tickFormatter={(t) => formatCandleTick(Number(t), intervalId)}
-            stroke="#71717a"
-            tick={{ fill: "#a1a1aa", fontSize: 11 }}
-            minTickGap={36}
-          />
-          <YAxis
-            domain={[min - pad, max + pad]}
-            tickFormatter={(v) =>
-              narrow ? formatAxisPrice(Number(v)) : formatEur(Number(v), true)
-            }
-            width={narrow ? 32 : 88}
-            mirror={narrow}
-            axisLine={!narrow}
-            tickLine={!narrow}
-            stroke="#71717a"
-            tick={{ fill: "#a1a1aa", fontSize: narrow ? 10 : 11 }}
-          />
-          <Tooltip
-            content={<CandleTooltip intervalId={intervalId} />}
-            cursor={{ fill: "rgba(255,255,255,0.04)" }}
-          />
-          <Bar
-            dataKey={(entry: CandleRow) => entry.body}
-            isAnimationActive={false}
-            maxBarSize={14}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            shape={(props: any) => <CandleBody {...props} />}
-          >
-            {rows.map((row) => (
-              <Cell key={row.t} fill={row.bullish ? "#34d399" : "#fb7185"} />
-            ))}
-            <ErrorBar
-              dataKey={(entry: CandleRow) => entry.wick}
-              width={1}
-              strokeWidth={1.5}
-              stroke="#a1a1aa"
-              direction="y"
-            />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+    <div className="relative h-[55vh] min-h-64 max-h-[28rem] w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-1.5 sm:h-96 sm:p-4">
+      {shown && !showStatus && (
+        <p className="pointer-events-none absolute left-3 top-3 z-10 max-w-[calc(100%-5rem)] truncate text-[11px] text-zinc-400 sm:left-6 sm:top-5 sm:text-xs">
+          <span className="text-zinc-500">
+            {formatCandleTooltipTime(shown.t, intervalId)}
+          </span>{" "}
+          <span className="text-zinc-500">O</span> {formatEur(shown.open)}{" "}
+          <span className="text-zinc-500">H</span> {formatEur(shown.high)}{" "}
+          <span className="text-zinc-500">L</span> {formatEur(shown.low)}{" "}
+          <span className={bullish ? "text-teal-400" : "text-red-400"}>
+            C {formatEur(shown.close)}
+          </span>
+        </p>
+      )}
+      {error ? (
+        <p className="absolute inset-0 z-20 flex items-center justify-center px-4 text-center text-rose-300">
+          {error}
+        </p>
+      ) : loading && candles.length === 0 ? (
+        <p className="absolute inset-0 z-20 flex items-center justify-center text-zinc-400">
+          Kerzen werden geladen…
+        </p>
+      ) : candles.length === 0 ? (
+        <p className="absolute inset-0 z-20 flex items-center justify-center text-zinc-400">
+          Keine Kerzendaten für dieses Intervall.
+        </p>
+      ) : null}
+      <div ref={hostRef} className="h-full w-full" />
     </div>
   );
 }
