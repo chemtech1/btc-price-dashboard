@@ -150,7 +150,7 @@ export function CandleChart({ candles, intervalId, loading, error }: Props) {
             tickFormatter={(v) =>
               narrow ? formatAxisPrice(Number(v)) : formatEur(Number(v), true)
             }
-            width={narrow ? 0 : 88}
+            width={narrow ? 32 : 88}
             mirror={narrow}
             axisLine={!narrow}
             tickLine={!narrow}
