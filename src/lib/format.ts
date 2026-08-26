@@ -17,9 +17,20 @@ const percent = new Intl.NumberFormat("de-DE", {
   maximumFractionDigits: 2,
 });
 
+const usd = new Intl.NumberFormat("de-DE", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 2,
+});
+
 export function formatEur(value: number, compact = false): string {
   if (!Number.isFinite(value)) return "–";
   return compact && Math.abs(value) >= 10_000 ? eurCompact.format(value) : eur.format(value);
+}
+
+export function formatUsd(value: number): string {
+  if (!Number.isFinite(value)) return "–";
+  return usd.format(value);
 }
 
 export function formatPercent(value: number): string {

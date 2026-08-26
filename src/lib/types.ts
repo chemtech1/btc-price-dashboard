@@ -10,6 +10,7 @@ export type CoinPrice = {
   name: string;
   image: string;
   current_price: number;
+  current_price_usd?: number;
   price_change_24h: number;
   price_change_percentage_24h: number;
   last_updated: string;

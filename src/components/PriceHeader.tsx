@@ -1,6 +1,6 @@
 "use client";
 
-import { formatEur, formatPercent } from "../lib/format";
+import { formatEur, formatPercent, formatUsd } from "../lib/format";
 import type { CoinPrice } from "../lib/types";
 
 type Props = {
@@ -53,6 +53,11 @@ export function PriceHeader({ coin, loading }: Props) {
 
       <p className="text-3xl font-bold tracking-tight text-white tabular-nums sm:text-5xl">
         {formatEur(coin.current_price)}
+        {coin.current_price_usd != null && (
+          <span className="ml-2 text-lg font-normal text-zinc-400 sm:text-2xl">
+            ({formatUsd(coin.current_price_usd)})
+          </span>
+        )}
       </p>
 
       <div className="flex flex-col gap-1 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">

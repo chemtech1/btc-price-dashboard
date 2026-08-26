@@ -77,7 +77,7 @@ export function getTicker(symbol: string): CoinPrice | undefined {
   if (!row) return undefined;
 
   const base = row.symbol.replace(/EUR$/, "");
-  return {
+  return withUsd({
     id: row.symbol,
     symbol: base.toLowerCase(),
     name: base,
@@ -86,7 +86,21 @@ export function getTicker(symbol: string): CoinPrice | undefined {
     price_change_24h: row.price_change_24h,
     price_change_percentage_24h: row.price_change_pct_24h,
     last_updated: row.last_updated,
-  };
+  });
+}
+
+export function getEurUsdtRate(): number | undefined {
+  const row = getDb()
+    .prepare("SELECT last_price FROM tickers WHERE symbol = 'EURUSDT'")
+    .get() as { last_price: number } | undefined;
+  const rate = row?.last_price;
+  if (rate == null || !Number.isFinite(rate) || rate <= 0) return undefined;
+  return rate;
+}
+
+export function withUsd(price: CoinPrice, rate = getEurUsdtRate()): CoinPrice {
+  if (rate == null) return price;
+  return { ...price, current_price_usd: price.current_price * rate };
 }
 
 export function getTickerFetchedAt(symbol: string): number | undefined {

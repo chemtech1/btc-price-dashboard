@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { formatEur, formatPercent } from "../lib/format";
+import { formatEur, formatPercent, formatUsd } from "../lib/format";
 import type { CoinPrice, SearchResult, WatchedCoin } from "../lib/types";
 
 type Props = {
@@ -174,6 +174,12 @@ export function CoinMenu({
                     <span className="block truncate font-medium text-white">{coin.name}</span>
                     <span className="block text-xs text-zinc-400">
                       {price ? formatEur(price.current_price) : "…"}
+                      {price?.current_price_usd != null && (
+                        <span className="text-zinc-500">
+                          {" "}
+                          ({formatUsd(price.current_price_usd)})
+                        </span>
+                      )}
                       {price && (
                         <span className={up ? " text-emerald-400" : " text-rose-400"}>
                           {" "}

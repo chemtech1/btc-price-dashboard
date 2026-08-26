@@ -50,6 +50,8 @@ async function binanceFetch<T>(path: string): Promise<T> {
   return promise;
 }
 
+export const EUR_USDT_SYMBOL = "EURUSDT";
+
 export function isEurSymbol(symbol: string): boolean {
   return /^[A-Z0-9]{2,20}EUR$/.test(symbol);
 }

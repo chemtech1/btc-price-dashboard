@@ -2,6 +2,7 @@ import {
   fetchEurPairsFromBinance,
   fetchHistoryPagesFromBinance,
   fetchKlinesPageFromBinance,
+  EUR_USDT_SYMBOL,
   fetchTickersFromBinance,
   isEurSymbol,
   klineRowsToDb,
@@ -25,6 +26,7 @@ import {
   getLatestKlineOpenTime,
   getTicker,
   getTickerFetchedAt,
+  withUsd,
   listEurPairs,
   listRecentTickerSymbols,
   pruneOldKlines,
@@ -94,22 +96,38 @@ export async function ensureTickers(symbols: string[]): Promise<CoinPrice[]> {
     }
   }
 
-  if (stale.length > 0) {
+  const fxFresh = isFresh(getTickerFetchedAt(EUR_USDT_SYMBOL), TICKER_TTL_MS);
+  const toFetch = fxFresh ? stale : [...stale, EUR_USDT_SYMBOL];
+
+  if (toFetch.length > 0) {
     try {
-      const tickers = await fetchTickersFromBinance(stale);
-      const fetched = tickers.map((ticker) =>
+      const tickers = await fetchTickersFromBinance(toFetch);
+      const fxTicker = tickers.find((t) => t.symbol === EUR_USDT_SYMBOL);
+      const coinTickers = tickers.filter((t) => t.symbol !== EUR_USDT_SYMBOL);
+      const fetched = coinTickers.map((ticker) =>
         tickerToPrice(ticker, baseBySymbol.get(ticker.symbol)),
       );
 
-      upsertTickers(
-        fetched.map((p) => ({
+      upsertTickers([
+        ...fetched.map((p) => ({
           symbol: p.id,
           last_price: p.current_price,
           price_change_24h: p.price_change_24h,
           price_change_pct_24h: p.price_change_percentage_24h,
           last_updated: p.last_updated,
         })),
-      );
+        ...(fxTicker
+          ? [
+              {
+                symbol: fxTicker.symbol,
+                last_price: Number(fxTicker.lastPrice),
+                price_change_24h: Number(fxTicker.priceChange),
+                price_change_pct_24h: Number(fxTicker.priceChangePercent),
+                last_updated: new Date(fxTicker.closeTime).toISOString(),
+              },
+            ]
+          : []),
+      ]);
 
       fresh.push(...fetched);
     } catch (err) {
@@ -122,7 +140,10 @@ export async function ensureTickers(symbols: string[]): Promise<CoinPrice[]> {
   }
 
   const byId = new Map(fresh.map((p) => [p.id, p]));
-  return unique.map((id) => byId.get(id)).filter((p): p is CoinPrice => p != null);
+  return unique
+    .map((id) => byId.get(id))
+    .filter((p): p is CoinPrice => p != null)
+    .map((p) => withUsd(p));
 }
 
 function historyNeedsRefresh(
