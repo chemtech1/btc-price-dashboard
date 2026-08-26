@@ -158,7 +158,7 @@ export function CoinMenu({
                     onSelect(coin.id);
                     onClose();
                   }}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${
+                  className={`flex w-full items-center gap-3 rounded-xl py-3 pl-3 pr-14 text-left transition ${
                     active ? "bg-orange-500/15 ring-1 ring-orange-500/40" : "hover:bg-white/5"
                   }`}
                 >
@@ -193,8 +193,12 @@ export function CoinMenu({
                   <button
                     type="button"
                     title="Entfernen"
-                    onClick={() => onRemove(coin.id)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs text-zinc-500 opacity-0 hover:bg-rose-500/20 hover:text-rose-300 group-hover:opacity-100"
+                    aria-label={`${coin.name} entfernen`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(coin.id);
+                    }}
+                    className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-md text-xs text-zinc-400 touch-manipulation hover:bg-rose-500/20 hover:text-rose-300"
                   >
                     Entf.
                   </button>
