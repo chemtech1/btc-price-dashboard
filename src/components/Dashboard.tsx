@@ -23,6 +23,7 @@ import { CoinMenu } from "./CoinMenu";
 import { PriceChart } from "./PriceChart";
 import { PriceHeader } from "./PriceHeader";
 import { RangeSelector } from "./RangeSelector";
+import { SiteNav } from "./SiteNav";
 
 const CandleChart = dynamic(
   () => import("./CandleChart").then((m) => ({ default: m.CandleChart })),
@@ -317,7 +318,7 @@ export function Dashboard() {
             {watchlist.length}
           </span>
         </button>
-        <p className="text-xs text-zinc-500 sm:text-sm">Binance · EUR</p>
+        <SiteNav />
       </header>
 
       <section className="sticky top-0 z-30 -mx-3 border-b border-white/10 bg-zinc-950/90 px-3 py-3 backdrop-blur-md sm:static sm:mx-0 sm:rounded-3xl sm:border sm:bg-zinc-900/40 sm:p-8 sm:shadow-2xl sm:shadow-black/30 sm:backdrop-blur-none">
